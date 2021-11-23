@@ -17,8 +17,8 @@ Install a python distribution such as WinPython.
 Download the files in the root folder of this repository to a folder with execute permissions. On Windows this means a folder outside the user directories, because locations such as Downloads, Documents, Desktop, etc do not allow .cmd files to run.  
 ## Run
 The simples way to run is to execute the supplied .cmd file, which should detect a WinPython distribution and use it.  
-For other distributions, manually call the main script with:
-`python vtk_reserves.py`
+For other distributions, manually call the main script with:  
+`python vtk_reserves.py`  
 Either way the user interface should appear:  
 ![screenshot1](./assets/screenshot1.png?raw=true)
 ## Output
@@ -38,7 +38,7 @@ It will also contain volume, mass and weighted mean of numerical variables such 
   
 ![screenshot2](./assets/screenshot2.png?raw=true)
 ## Sample Data
-There is a simple artificial dataset on the sample_data folder of this repository
+There is a simple artificial dataset on the sample_data folder of this repository for testing and reference.
 ## File Formats
 The block model can be a csv or vtk. The vtk object type should be a UniformGrid with the block model variables as cell_arrays.  
 A block model conversor from Vulcan file format (BMF) is included: bm_to_vtk.py.  
