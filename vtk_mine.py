@@ -71,20 +71,12 @@ class GridMine(object):
     
     mz = mg.ptc().get_array('implicit_distance')
     if out:
-      #mz *= -1
-      mz = np.less(mz, 0)
+      # BOOL AND of cells outside
+      self._gz &= np.less(mz, 0)
     else:
-      mz = np.greater_equal(mz, 0)
+      # BOOL OR of cells inside
+      self._gz |= np.greater_equal(mz, 0)
     # TODO: compute_normals
-    #if self._gz is None:
-    #  self._gz = mz
-    if out:
-      #print(np.min([self._gz, mz], 0))
-      #self._gz = np.min([self._gz, mz], 0)
-      self._gz &= mz
-    else:
-      #self._gz = np.max([self._gz, mz], 0)
-      self._gz |= mz
 
     return None
   
@@ -94,7 +86,7 @@ class GridMine(object):
     return self._grid
 
 def vtk_mine(blocks, mine_include, mine_exclude, output, display):
-  print("main")
+  print("main", file=sys.stderr)
   grid = vtk_Voxel.from_file_path(blocks)
   print(grid)
   meshes = []

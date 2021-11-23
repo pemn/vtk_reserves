@@ -3,7 +3,7 @@
 # v1.1 11/2021 paulo.ernesto
 # v1.0 10/2020 paulo.ernesto
 '''
-usage: $0 block_model*vtk variables#variable:block_model#type=breakdown,count,sum,mean,min,max,var,std,sem,q1,q2,q3,p10,p90,major,list#weight:block_model regions#region*vtk mine_include#mesh_include*vtk,obj,msh mine_exclude#mesh_exclude*vtk,obj,msh output*xlsx display@
+usage: $0 block_model*vtk,csv variables#variable:block_model#type=breakdown,count,sum,mean,min,max,var,std,sem,q1,q2,q3,p10,p90,major,list#weight:block_model regions#region*vtk,obj,msh mine_include#mesh_include*vtk,obj,msh mine_exclude#mesh_exclude*vtk,obj,msh output*xlsx display@
 '''
 '''
 Copyright 2017 - 2021 Vale
@@ -30,27 +30,23 @@ from _gui import usage_gui, pyd_zip_extract, commalist, pd_save_dataframe
 
 import numpy as np
 import pandas as pd
+from pd_vtk import vtk_Voxel, pv_read, vtk_plot_meshes, vtk_mesh_info
 from vtk_mine import GridMine
 from vtk_flag_regions import vtk_flag_region
 from bm_breakdown import pd_breakdown
 
-def cell_volume(grid, cid):
-  b = grid.GetCell(cid).GetBounds()
-  return np.prod(np.subtract(b[1::2], b[0::2]))
-
-def cells_volume(grid):
-  r = np.zeros(grid.n_cells)
-  for cid in range(grid.n_cells):
-    b = grid.GetCell(cid).GetBounds()
-    r[cid] = np.prod(np.subtract(b[1::2], b[0::2]))
-  return r
 
 def pd_grid_depletion(block_model, regions, mine_include, mine_exclude):
   ''' create raw dataframe with the reserves data '''
   meshes = []
-  from pd_vtk import vtk_Voxel, pv_read
+  print("load grid", file=sys.stderr)
   grid = vtk_Voxel.from_file_path(block_model)
-
+  
+  if 'volume' not in grid.array_names:
+    print("flag volume", file=sys.stderr)
+    vtk_Voxel.cells_volume(grid, 'volume')
+    
+  print("mine include", file=sys.stderr)
   gm = GridMine(grid)
   for fp in mine_include:
     if os.path.exists(fp):
@@ -60,7 +56,7 @@ def pd_grid_depletion(block_model, regions, mine_include, mine_exclude):
 
   if gm.blank:
     gm.fill(1)
-
+  print("mine exclude", file=sys.stderr)
   for fp in mine_exclude:
     if os.path.exists(fp):
       mesh = pv_read(fp)
@@ -71,17 +67,21 @@ def pd_grid_depletion(block_model, regions, mine_include, mine_exclude):
 
   r_meshes = []
   r_values = []
+  print("load regions", file=sys.stderr)
   for r_path in regions:
     if len(r_path) and os.path.exists(r_path):
+      print(r_path)
       r_values.append(os.path.splitext(os.path.basename(r_path))[0])
       r_meshes.append(pv_read(r_path))
   meshes.extend(r_meshes)
-  vtk_flag_region(grid, r_meshes, 'region', True, r_values)
 
+  print("flag region", file=sys.stderr)
+  vtk_flag_region(grid, r_meshes, 'region', True, r_values)
+  
   meshes.append(grid)
 
   df = pd.DataFrame(np.transpose(grid.cell_arrays.values()), columns=grid.cell_arrays)
-  df['volume'] = cells_volume(grid)
+  #df = pd.DataFrame(np.concatenate([grid.cell_arrays[_] for _ in grid.cell_arrays], 1), columns=grid.cell_arrays)
 
   if len(r_meshes):
     # exclude rows where region is empty
@@ -111,17 +111,15 @@ def vtk_reserves(block_model, variables, regions, mine_include, mine_exclude, ou
   odf = pd_breakdown(idf, vl)
 
   if output:
-    #pd_save_dataframe(odf, output)
-    pd_save_dataframe(idf, output)
+    pd_save_dataframe(idf, 'dump.csv')
+    pd_save_dataframe(odf, output)
   else:
     print(odf.to_string())
 
   if int(display):
-    from pd_vtk import vtk_plot_meshes
     vtk_plot_meshes(meshes)
 
-
-  print("finished")
+  print("finished", file=sys.stderr)
 
 
 main = vtk_reserves
@@ -129,3 +127,4 @@ main = vtk_reserves
 if __name__=="__main__":
   pyd_zip_extract()
   usage_gui(__doc__)
+

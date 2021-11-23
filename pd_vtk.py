@@ -253,12 +253,10 @@ def vtk_mesh_to_df(mesh, face_size = None):
       # in some cases, n_faces may be > 0  but with a empty faces array
       if mesh.n_cells and len(mesh.cells):
         faces = mesh.cells
-        #print(faces[:9])
         if face_size is None:
           face_size = int(faces[0])
         elif face_size < int(faces[0]):
           faces = vtk_cells_to_faces(faces)
-        #print(faces[:12])
 
         points = mesh.points.take(faces.flat, 0)
         arr_node = arr_node.take(faces.flat)
@@ -356,10 +354,34 @@ class vtk_Voxel(pv.UniformGrid):
     dims = np.add(np.ceil(np.divide(np.subtract(bb1, bb0), cell_size)), 3)
     origin = np.subtract(bb0, cell_size)
 
-    return cls(dims.astype(np.int), np.full(3, cell_size, dtype=np.int), origin)
+    self = cls(dims.astype(np.int_), np.full(3, cell_size, dtype=np.int_), origin)
+    self.add_arrays_from_df(df, xyz, set(df.columns).difference(xyz))
+    return self
+
+  def add_arrays_from_df(self, df, xyz, vl):
+    if df.shape[0] == self.n_cells:
+      # each cell matches with a df row
+      for v in vl:
+        self.cell_arrays[v] = df[v].values
+    else:
+      # find nearest cell using geometry
+      # cache arrays. using directly from mesh.cell_arrays is bugged.
+      ca = dict([(v,np.empty(self.n_cells, dtype=df[v].dtype)) for v in vl])
+
+      for ri, rd in df.iterrows():
+        rc = self.find_closest_cell(rd[xyz].values)
+        if rc >= 0:
+          for v in vl:
+            ca[v][rc] = rd[v]
+
+      for v in vl:
+        self.cell_arrays[v] = ca[v]
+    
+    return self
 
   @classmethod
   def from_file_path(cls, fp):
+    ''' fire and forget parsing for multiple file types '''
     if not re.search(r'vt(k|m)$', fp, re.IGNORECASE):
       from _gui import pd_load_dataframe
       df = pd_load_dataframe(fp)
@@ -417,6 +439,52 @@ class vtk_Voxel(pv.UniformGrid):
 
     return cv
 
+
+  def cells_volume(self, v = None):
+    ''' calculate a array with volume of each cell '''
+    r = np.zeros(self.n_cells)
+    for i in range(self.n_cells):
+      b = self.GetCell(i).GetBounds()
+      r[i] = np.prod(np.subtract(b[1::2], b[0::2]))
+    if v is not None:
+      self.cell_arrays[v] = r
+    return r
+
+  def add_arrays_from_bmf(self, bm, condition, variables):
+    if isinstance(variables, str):
+      variables = [variables]
+    # its easy to make a UniformGrid, but we will need functions
+    # only available to a StructuredGrid
+    grid = self.cast_to_structured_grid()
+
+    cv = [np.ndarray(grid.GetNumberOfCells(), dtype=[np.object, np.float_, np.float_, np.int_, np.int_][['name', 'integer', '***', 'float', 'bool'].index(bm.field_type(v))]) for v in variables]
+
+    bl = None
+    if condition:
+      block_select = bm_sanitize_condition(condition)
+      bl = bm.get_matches(block_select)
+    
+    cells = grid.cell_centers().points
+    for cellId in range(grid.GetNumberOfCells()):
+      #xyz = VoxelVTK.sGetCellCenter(grid, cellId)
+      xyz = cells[cellId]
+      if bm.find_world_xyz(*xyz):
+        # point outside block model data region
+        grid.BlankCell(cellId)
+      elif bl is not None and bm.get_position() not in bl:
+        grid.BlankCell(cellId)
+      else:
+        for i in range(len(variables)):
+          # if bm.is_string(variables[i]):
+          if cv[i].dtype == np.object:
+            cv[i][cellId] = bm.get_string(variables[i])
+          else:
+            cv[i][cellId] = bm.get(variables[i])
+
+    for i in range(len(variables)):
+      grid.cell_arrays[variables[i]] = cv[i]
+
+    return grid
 
 def vtk_texture_to_array(tex):
   ' WORKING drop in replacement for to_array()'
@@ -553,3 +621,8 @@ def vtk_meshes_to_obj(meshes):
 
 if __name__=="__main__":
   pass
+  grid = vtk_Voxel.from_file_path('std_voxel.csv')
+  print(vtk_mesh_info(grid))
+  #print(grid.array_names)
+  #pv_save(grid, 'output.vtk')
+
