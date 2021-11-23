@@ -19,6 +19,19 @@ Either way the user interface should appear:
 ## Output
 The result is a reserves table split by lithology, region and possibly other classificatory variables.  
 It will also contain volume, mass and weighted mean of numerical variables such as grade.
+| region | lito | grade mean | density mean | volume sum | mass
+| --- | --- | --- | --- | --- | --- |
+| vox_region1 | high |  |  | 0.0 | 0.0 |
+| vox_region1 | low |  |  | 0.0 | 0.0 |
+| vox_region1 | medium |  |  | 0.0 | 0.0 |
+| vox_region2 | high | 69.53446163437245 | 87.6740902065477 | 28468000.0 | 2495906000.0 |
+| vox_region2 | low | 21.11175785797439 | 79.5 | 17180000.0 | 1365810000.0 |
+| vox_region2 | medium | 45.963415442028904 | 81.37556154537286 | 44520000.0 | 3622840000.0 |
+| vox_region3 | high | 69.4 | 84.5 | 7500000.0 | 633750000.0 |
+| vox_region3 | low | 21.64715704429221 | 78.52418911489829 | 7276000.0 | 571342000.0 |
+| vox_region3 | medium | 44.76301545763373 | 77.48488664987406 | 15880000.0 | 1230460000.0 |
+  
+![screenshot2](./assets/screenshot2.png?raw=true)
 ## Sample Data
 There is a simple artificial dataset on the sample_data folder of this repository
 ## File Formats
