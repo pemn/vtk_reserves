@@ -13,7 +13,7 @@ The modules used include:
 
 ## Maturity
 This solution is feature complete but still under active development.  
-Its intended for academic purposes, comparison and as a technological demonstrator of solving the required steps.  
+Its intended for academic purposes, reserve comparison with mature tools and as a technological demonstrator of solving the required steps.  
 Its not yet suited for production use.  
 ## How to install
 First, install a python distribution such as [WinPython](https://winpython.github.io/).  
