@@ -38,7 +38,7 @@ It will also contain volume, mass and weighted mean of numerical variables such 
 | vox_region3 | low | 21.64715704429221 | 78.52418911489829 | 7276000.0 | 571342000.0 |
 | vox_region3 | medium | 44.76301545763373 | 77.48488664987406 | 15880000.0 | 1230460000.0 |
   
-If the display checkbox is ticked, a 3d window should appear showing the data used:
+If the display checkbox is ticked, a 3d window should appear showing the data used:  
 ![screenshot2](./assets/screenshot2.png?raw=true)
 ## Sample Data
 There is a simple artificial dataset on the sample_data folder of this repository for testing and reference.
