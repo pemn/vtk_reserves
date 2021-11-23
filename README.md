@@ -37,8 +37,12 @@ The surfaces and solids can be in those supported formats:
  - obj (wavefront)
  - msh (leapfrog)
  - vtk (containing PolyData Mesh object types).  
+
 Regions are used to split the report by the areas withing those closed solids.  
 Mine exclude and mine include are used to "mine up" or "mine down". Usualy topographies are "mine up" (include) and mining pit are "mine down" (exclude).  
+Output can be in one of those formats:
+ - csv
+ - xlsx
 ## Output
 The result is a reserves report split by lithology, region and possibly other classificatory variables.  
 It will also contain volume, mass and weighted mean of numerical variables such as grade.
