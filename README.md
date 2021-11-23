@@ -15,6 +15,12 @@ The simples way to run is to execute the supplied .cmd file, which should detect
 For other distributions, manually call the main script with:
 `python vtk_reserves.py`
 Either way the user interface should appear:
-[screenshot1]!assets/screenshot1.png
-
+![screenshot1](./assets/screenshot1.png?raw=true)
+## Output
+The result is a reserves table split by lithology, region and possibly other classificatory variables.  
+It will also contain volume, mass and weighted mean of numerical variables such as grade.
+## Sample Data
+There is a simple artificial dataset on the sample_data folder of this repository
+## License
+Apache 2.0
 
