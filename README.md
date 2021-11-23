@@ -38,7 +38,7 @@ The surfaces and solids can be in those supported formats:
  - msh (leapfrog)
  - vtk (containing PolyData Mesh object types).  
 
-Regions are used to split the report by the areas withing those closed solids.  
+Regions are used to split the report by the areas within closed solids. Each area/region will have the same name as the file.   
 Mine exclude and mine include are used to "mine up" or "mine down". Usualy topographies are "mine up" (include) and mining pit are "mine down" (exclude).  
 Output can be in one of those formats:
  - csv
