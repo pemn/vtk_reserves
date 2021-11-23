@@ -2,7 +2,8 @@
 ore body reserve report using geological block model, topographical surfaces and region solids
   
 ## Description
-This is a complete toolchain to calculate ore body reserves from a geological block model, topographical surfaces and region solids.  
+This is a complete standalone toolchain to calculate ore body reserves from a geological block model, topographical surfaces and region solids.  
+Its intended for high level use, with no required knowledge of programming or python.  
 While there are many software packages that enable this calculation, this is a fully open source sollution. Free, auditable and extendable.  
 It integrates multiple mature python modules to handle each step of this complex process.  
 The modules used include:  
