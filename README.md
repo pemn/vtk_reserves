@@ -21,6 +21,10 @@ The result is a reserves table split by lithology, region and possibly other cla
 It will also contain volume, mass and weighted mean of numerical variables such as grade.
 ## Sample Data
 There is a simple artificial dataset on the sample_data folder of this repository
+## File Formats
+The block model can be a csv or vtk. The vtk object type should be a UniformGrid with the block model variables as cell_arrays.  
+A block model conversor from Vulcan file format (BMF) is included: bm_to_vtk.py.  
+The surfaces and solids can be csv, obj (wavefront), msh (leapfrog) or vtk. The bm_to_vtk.py will also convert between this formats, and also from the 00t Vulcan format. 
 ## License
 Apache 2.0
 
