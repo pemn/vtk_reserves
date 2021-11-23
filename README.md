@@ -14,10 +14,10 @@ Download the files in the root folder of this repository to a folder with execut
 The simples way to run is to execute the supplied .cmd file, which should detect a WinPython distribution and use it.  
 For other distributions, manually call the main script with:
 `python vtk_reserves.py`
-Either way the user interface should appear:
+Either way the user interface should appear:  
 ![screenshot1](./assets/screenshot1.png?raw=true)
 ## Output
-The result is a reserves table split by lithology, region and possibly other classificatory variables.  
+The result is a reserves report split by lithology, region and possibly other classificatory variables.  
 It will also contain volume, mass and weighted mean of numerical variables such as grade.
 | region | lito | grade mean | density mean | volume sum | mass
 | --- | --- | --- | --- | --- | --- |
