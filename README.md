@@ -31,7 +31,8 @@ It can also convert between multiple supported triangulation formats. See next s
 ## Usage
 The block model must be in one of the supported formats:
  - csv file, containing x,y,z of each block and variables.
- - vtk file with a UniformGrid object type and the variables as cell_arrays.
+ - vtk file with a UniformGrid object type and the variables as cell_arrays.  
+
 The surfaces and solids can be in those supported formats:
  - csv (ASCII, with x,y,z and faces)
  - obj (wavefront)
