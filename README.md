@@ -13,7 +13,7 @@ The modules used include:
 ## Maturity
 This solution is under active development.  
 ## How to install
-First, install a python distribution such as ![WinPython](https://winpython.github.io/).  
+First, install a python distribution such as [WinPython](https://winpython.github.io/).  
 Download the files the repository root folder to a folder with execute permissions. On Windows this means a folder outside the user directories, because locations such as Downloads, Documents, Desktop, etc do not allow .cmd files to run.  
 Only one required module is not included by default in WinPython and other mainstrean distros: pyvista. Install using:  
 `pip install pyvista`
