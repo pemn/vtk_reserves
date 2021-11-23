@@ -203,6 +203,10 @@ def vtk_dmbm_to_ug(df):
 
 def vtk_plot_meshes(meshes, point_labels=False, cmap = None):
   # plt.cm.terrain
+  # plt.cm.plasma
+  # plt.cm.gray
+  # plt.cm.spectral
+  # plt.cm.Paired
   # if pv is None: return
   p = pv.Plotter()
   p.add_axes()
@@ -216,7 +220,7 @@ def vtk_plot_meshes(meshes, point_labels=False, cmap = None):
       color = None
       if cmap is not None:
         color = cmap(i/max(1,len(meshes)-1))
-        print(i, i/max(1,len(meshes)-1), color)
+        #print(i, i/max(1,len(meshes)-1), color)
 
       if mesh.GetDataObjectType() in [2,6]:
         p.add_mesh(mesh.slice_orthogonal(), opacity=0.5)

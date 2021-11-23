@@ -45,7 +45,7 @@ def pd_grid_depletion(block_model, regions, mine_include, mine_exclude):
   if 'volume' not in grid.array_names:
     print("flag volume", file=sys.stderr)
     vtk_Voxel.cells_volume(grid, 'volume')
-    
+
   print("mine include", file=sys.stderr)
   gm = GridMine(grid)
   for fp in mine_include:
@@ -111,13 +111,13 @@ def vtk_reserves(block_model, variables, regions, mine_include, mine_exclude, ou
   odf = pd_breakdown(idf, vl)
 
   if output:
-    pd_save_dataframe(idf, 'dump.csv')
     pd_save_dataframe(odf, output)
   else:
     print(odf.to_string())
 
   if int(display):
-    vtk_plot_meshes(meshes)
+    import matplotlib.pyplot as plt
+    vtk_plot_meshes(meshes, False, plt.cm.terrain)
 
   print("finished", file=sys.stderr)
 
