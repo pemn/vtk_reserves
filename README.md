@@ -12,7 +12,7 @@ The modules used include:
  - tkinter (graphical interface)
 
 ## Maturity
-This solution is under active development.  
+This solution is feature complete but still under active development.  
 Its intended for academic purposes and comparison.  
 Its not yet suited for production use.  
 ## How to install
