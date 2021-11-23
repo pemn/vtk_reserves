@@ -4,7 +4,12 @@ ore body reserve calculation using block model, surface and solids
 ## Description
 This is a complete toolchain to calculate ore body reserves from a geological block model, topographical surfaces and region solids.  
 While there are many software packages that enable this calculation, this is a fully open source sollution. Free, auditable and extendable.  
-It integrates multiple mature, python modules to handle each step of this complex process.  
+It integrates multiple mature python modules to handle each step of this complex process.  
+The mudules used include:  
+ - pyvista (geometry calculations and rendering
+ - pandas (number crunching)
+ - tkinter (graphical interface)
+
 ## Maturity
 This solution is under active development.  
 ## How to install
