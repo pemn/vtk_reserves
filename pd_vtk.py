@@ -615,7 +615,8 @@ def vtk_meshes_to_obj(meshes):
   for mesh in meshes:
     od['f'].extend(np.add(len(od['v']), vtk_cells_to_faces(mesh.faces)))
     od['v'].extend(mesh.points)
-    od['vt'].extend(mesh.t_coords)
+    if mesh.t_coords:
+      od['vt'].extend(mesh.t_coords)
 
   return od
 
