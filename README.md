@@ -19,7 +19,7 @@ Download all files from this repository root to a local folder with execute perm
 Only one required module is not included by default in WinPython and other mainstrean distros: pyvista. Install using:  
 `pip install pyvista`
 ## Run
-The simplest way to run is to execute (double click on windows explorer) the supplied vtk_reserves.cmd file. This batch shoud should detect a WinPython distribution and use it automatically to call the main py file (vtk_reserves.py).  
+The simplest way to run is to execute (double click on windows explorer) the supplied vtk_reserves.cmd file. This batch script shoud detect a WinPython distribution and use it automatically to call the main py file (vtk_reserves.py).  
 For other distributions, manually call the main script with:  
 `python vtk_reserves.py`  
 Either way the user interface should appear:  
