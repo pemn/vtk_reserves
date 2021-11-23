@@ -24,6 +24,21 @@ For other distributions, manually call the main script with:
 `python vtk_reserves.py`  
 Either way the user interface should appear:  
 ![screenshot1](./assets/screenshot1.png?raw=true)
+## Preparing Data
+The included converter tool bm_to_vtk.py can be used to convert data to the supported formats.
+For instance, it can convert Vulcan block models (BMF) to the VTK format.
+It can also convert between multiple supported triangulation formats. See next section.
+## Usage
+The block model must be in one of the supported formats:
+ - csv file, containing x,y,z of each block and variables.
+ - vtk file with a UniformGrid object type and the variables as cell_arrays.
+The surfaces and solids can be in those supported formats:
+ - csv (ASCII, with x,y,z and faces)
+ - obj (wavefront)
+ - msh (leapfrog)
+ - vtk (containing PolyData Mesh object types).  
+Regions are used to split the report by the areas withing those closed solids.  
+Mine exclude and mine include are used to "mine up" or "mine down". Usualy topographies are "mine up" (include) and mining pit are "mine down" (exclude).  
 ## Output
 The result is a reserves report split by lithology, region and possibly other classificatory variables.  
 It will also contain volume, mass and weighted mean of numerical variables such as grade.
@@ -43,10 +58,6 @@ If the display checkbox is ticked, a 3d window should appear showing the data us
 ![screenshot2](./assets/screenshot2.png?raw=true)
 ## Sample Data
 There is a simple artificial dataset on the sample_data folder of this repository for testing and reference.
-## File Formats
-The block model can be a csv or vtk. The vtk object type should be a UniformGrid with the block model variables as cell_arrays.  
-A block model conversor from Vulcan file format (BMF) is included: bm_to_vtk.py.  
-The surfaces and solids can be csv, obj (wavefront), msh (leapfrog) or vtk. The bm_to_vtk.py will also convert between this formats, and also from the 00t Vulcan format. 
 ## License
 Apache 2.0
 
