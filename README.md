@@ -13,6 +13,8 @@ The modules used include:
 
 ## Maturity
 This solution is under active development.  
+Its intended for academic purposes and comparison.  
+Its not yet suited for production use.  
 ## How to install
 First, install a python distribution such as [WinPython](https://winpython.github.io/).  
 Download all files from this repository root to a local folder with execute permissions. On Windows this means a folder outside the user directories, because locations such as Downloads, Documents, Desktop, etc do not allow .cmd files to run.  
