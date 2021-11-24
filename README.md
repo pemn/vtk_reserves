@@ -17,7 +17,7 @@ Its intended for academic purposes, reserve comparison with mature tools and as 
 Its not yet suited for production use.  
 ## How to install
 First, install a python distribution such as [WinPython](https://winpython.github.io/). Version must be >= 3.7. Version 3.8.x recomended.   
-Do **not** install the base python from Python.org because it will lack countless required modules.  
+Do **not** use the installer from Python.org because it will lack countless required modules. Distros exist for a reason!  
 Once the python enviroments is already setup and working, download all files from this repository root to a local folder with execute permissions. On Windows this means a folder outside the user directories, because locations such as Downloads, Documents, Desktop, etc do not allow .cmd files to run.  
 Only one required module is not included by default in WinPython and other mainstrean distros:  
  - pyvista  
