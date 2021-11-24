@@ -12,7 +12,7 @@ import sys, os.path
 # import modules from a pyz (zip) file with same name as scripts
 sys.path.insert(0, os.path.splitext(sys.argv[0])[0] + '.pyz')
 
-from _gui import pyd_zip_extract, usage_gui, bm_sanitize_condition, commalist, wavefront_save_obj
+from _gui import pyd_zip_extract, usage_gui, bm_sanitize_condition, commalist, wavefront_save_obj, table_name_selector
 
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ pyd_zip_extract()
 import pyvista as pv
 #from vulcanvtk import vtri_to_vtk
 from vulcan_save_tri import vulcan_load_tri
-from pd_vtk import vtk_Voxel, vtk_meshes_to_obj, vtk_plot_meshes
+from pd_vtk import vtk_Voxel, vtk_meshes_to_obj, vtk_plot_meshes, pv_save
 
 # convert a vulcan surface to a vulcan solid
 def main(input_data, condition, variables, output, display):
@@ -33,25 +33,28 @@ def main(input_data, condition, variables, output, display):
     variables = commalist().parse(variables).split()
   print("variables")
   print(variables)
-  if input_data.lower().endswith('bmf'):
+  file_path, table_name = table_name_selector(input_data)
+
+  if file_path.lower().endswith('bmf'):
     import vulcan
     if len(variables) == 0:
       variables = ['volume']
-    bm = vulcan.block_model(input_data)
-    #mesh = bm_to_vtk(bm, condition, variables)
-    grid = vtk_Voxel.from_bmf(bm)
+    
+    bm = vulcan.block_model(file_path)
+
+    grid = vtk_Voxel.from_bmf(bm, table_name)
     mesh = grid.add_arrays_from_bmf(bm, condition, variables)
-  elif input_data.lower().endswith('00t'):
+  elif file_path.lower().endswith('00t'):
     nodes, faces, cv, cn = vulcan_load_tri(input_path)
     mesh = vtk_nf_to_mesh(nodes, faces)
   else:
-    mesh = pv.read(input_data)
+    mesh = pv.read(file_path)
   print(mesh)
   if output.lower().endswith('obj'):
     od = vtk_meshes_to_obj([mesh])
     wavefront_save_obj(output, od)
   elif output:
-    mesh.save(output)
+    pv_save(mesh, output)
 
   if int(display):
     vtk_plot_meshes([mesh])

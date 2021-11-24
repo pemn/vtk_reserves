@@ -41,18 +41,42 @@ VTK_MULTIBLOCK_DATA_SET = 13
 def pv_read(fp):
   ''' simple import safe pyvista reader '''
   #if pv is None: return
-  if not re.search(r'vt(k|m)$', fp, re.IGNORECASE):
-    from _gui import pd_load_dataframe
-    df = pd_load_dataframe(fp)
-    mesh = vtk_df_to_mesh(df)
+  if fp.lower().endswith('msh'):
+    from _gui import leapfrog_load_mesh
+    nodes, faces = leapfrog_load_mesh(fp)
+    mesh = vtk_nf_to_mesh(nodes, faces)
+  elif fp.lower().endswith('obj'):
+    from _gui import wavefront_load_obj
+    od = wavefront_load_obj(fp)
+    mesh = vtk_nf_to_mesh(od.get('v'), od.get('f'))
+  elif fp.lower().endswith('00t'):
+    import vulcan_load_tri
+    nodes, faces, cv, cn = vulcan_save_tri.vulcan_load_tri(fp)
+    mesh = vtk_nf_to_mesh(nodes, faces)
   else:
     mesh = pv.read(fp)
+  # elif re.search(r'vt(k|m)$', fp, re.IGNORECASE):
+    # from _gui import pd_load_dataframe
+    # df = pd_load_dataframe(fp)
+    # mesh = vtk_df_to_mesh(df)
   return mesh
 
 def pv_save(meshes, fp, binary=True):
   ''' simple import safe pyvista writer '''
   #if pv is None: return
-  if not re.search(r'vt(k|m)$', fp, re.IGNORECASE):
+  if fp.lower().endswith('obj'):
+    from _gui import wavefront_save_obj
+    od = vtk_meshes_to_obj(meshes)
+    wavefront_save_obj(fp, od)
+  elif fp.lower().endswith('msh'):
+    from _gui import leapfrog_save_mesh
+    od = vtk_meshes_to_obj(meshes)
+    leapfrog_save_mesh(od.get('v'), od.get('f'), fp)
+  elif fp.lower().endswith('00t'):
+    import vulcan_save_tri
+    od = vtk_meshes_to_obj(meshes)
+    vulcan_save_tri.vulcan_save_tri(od.get('v'), od.get('f'), fp)
+  elif not re.search(r'vt(k|m)$', fp, re.IGNORECASE):
     df = pd.DataFrame()
     if not isinstance(meshes, list):
       meshes = [meshes]
@@ -325,6 +349,8 @@ class vtk_Voxel(pv.UniformGrid):
   def from_bmf(cls, bm, n_schema = None):
     if n_schema is None:
       n_schema = bm.model_n_schemas()-1
+    else:
+      n_schema = int(n_schema)
     size = np.resize(bm.model_schema_size(n_schema), 3)
     dims = bm.model_schema_dimensions(n_schema)
     o0 = bm.model_schema_extent(n_schema)
@@ -333,7 +359,7 @@ class vtk_Voxel(pv.UniformGrid):
 
   @classmethod
   def from_bb(cls, bb, cell_size = 10, ndim = 3):
-    dims = np.add(np.ceil(np.divide(np.subtract(bb[1], bb[0]), cell_size)), 3)
+    dims = np.add(np.ceil(np.divide(np.subtract(bb[1], bb[0]), cell_size)), 2)
     origin = np.subtract(bb[0], cell_size)
     if ndim == 2:
       dims[2] = 1
@@ -350,13 +376,20 @@ class vtk_Voxel(pv.UniformGrid):
     if cell_size is None:
       if 'zlength' in df:
         cell_size = df['zlength'].min()
+        print("zlength cell_size: ", cell_size)
       else:
-        cell_size = 10
+        cell_size = (df[xyz[2]].max() - df[xyz[2]].min()) / (df[xyz[2]].unique().size - 1)
+        print("autodetect cell_size: ", cell_size)
 
     bb0 = df[xyz].min()
     bb1 = df[xyz].max()
-    dims = np.add(np.ceil(np.divide(np.subtract(bb1, bb0), cell_size)), 3)
-    origin = np.subtract(bb0, cell_size)
+
+    dims = np.add(np.ceil(np.divide(np.subtract(bb1, bb0), cell_size)), 2)
+
+    origin = np.subtract(bb0, cell_size * 0.5)
+
+    print("autodetect origin: %.2f,%.2f,%.2f" % tuple(origin))
+    print(bb0.to_list(), bb1.to_list(), dims.to_list())
 
     self = cls(dims.astype(np.int_), np.full(3, cell_size, dtype=np.int_), origin)
     self.add_arrays_from_df(df, xyz, set(df.columns).difference(xyz))
@@ -374,6 +407,7 @@ class vtk_Voxel(pv.UniformGrid):
 
       for ri, rd in df.iterrows():
         rc = self.find_closest_cell(rd[xyz].values)
+        #print(rd[xyz].to_list(), rc)
         if rc >= 0:
           for v in vl:
             ca[v][rc] = rd[v]
