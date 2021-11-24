@@ -18,10 +18,12 @@ Its not yet suited for production use.
 ## How to install
 First, install a python distribution such as [WinPython](https://winpython.github.io/). Version must be >= 3.7. Version 3.8.x recomended.   
 Do **not** use the installer from Python.org because it will lack countless required modules. Distros exist for a reason!  
-Once the python enviroments is already setup and working, download all files from this repository root to a local folder with execute permissions. On Windows this means a folder outside the user directories, because locations such as Downloads, Documents, Desktop, etc do not allow .cmd files to run.  
+After Python is installed you can test its really working by using the following command:
+`python -V`  
+Then download all files from this repository root to a local folder with execute permissions. On Windows this means a folder outside the user directories, because locations such as Downloads, Documents, Desktop, etc do not allow .cmd files to run.  
 Only one required module is not included by default in WinPython and other mainstrean distros:  
  - pyvista  
-  
+
 Install using this folowing command in the **WinPython Command Prompt** (not the Python Interpreter!):  
 `pip install pyvista`  
 ![screenshot3](./assets/screenshot3.png?raw=true)
