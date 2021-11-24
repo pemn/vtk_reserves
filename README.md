@@ -66,7 +66,8 @@ If the display checkbox is ticked, a 3d window should appear showing the data us
 ## Sample Data
 There is a simple artificial dataset on the sample_data folder of this repository for testing and reference.
 ## Auxiliary tools
- - bm_to_vtk.py: convert between file formats
+ - bm_to_vtk.py: convert between file formats.
+Note: Converting from/to Vulcan proprietary file formats is only possible when the script is executed using the `File > Python Script` menu within Envisage.
  - tri_decimate.py: reduce mesh complexity to allow for faster testing
 ## License
 Apache 2.0
