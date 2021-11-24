@@ -65,6 +65,9 @@ If the display checkbox is ticked, a 3d window should appear showing the data us
 ![screenshot2](./assets/screenshot2.png?raw=true)
 ## Sample Data
 There is a simple artificial dataset on the sample_data folder of this repository for testing and reference.
+## Auxiliary tools
+ - bm_to_vtk.py: convert between file formats
+ - tri_decimate.py: reduce mesh complexity to allow for faster testing
 ## License
 Apache 2.0
 
