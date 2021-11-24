@@ -16,8 +16,9 @@ This solution is feature complete but still under active development.
 Its intended for academic purposes, reserve comparison with mature tools and as a technological demonstrator of solving the required steps.  
 Its not yet suited for production use.  
 ## How to install
-First, install a python distribution such as [WinPython](https://winpython.github.io/). Version must be >= 3.7. Version 3.8.x recomended.  
-Download all files from this repository root to a local folder with execute permissions. On Windows this means a folder outside the user directories, because locations such as Downloads, Documents, Desktop, etc do not allow .cmd files to run.  
+First, install a python distribution such as [WinPython](https://winpython.github.io/). Version must be >= 3.7. Version 3.8.x recomended.   
+Do **not** install the base python from Python.org because it will lack countless required modules.  
+Once the python enviroments is already setup and working, download all files from this repository root to a local folder with execute permissions. On Windows this means a folder outside the user directories, because locations such as Downloads, Documents, Desktop, etc do not allow .cmd files to run.  
 Only one required module is not included by default in WinPython and other mainstrean distros:  
  - pyvista  
   
