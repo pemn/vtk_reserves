@@ -28,7 +28,7 @@ Either way the user interface should appear:
 ![screenshot1](./assets/screenshot1.png?raw=true)
 ## Preparing Data
 The included converter tool bm_to_vtk.py can be used to convert data to the supported formats.
-For instance, it can convert Vulcan block models (BMF) to the VTK format.
+For instance, it can convert Vulcan block models (BMF) to VTK or CSV.
 It can also convert between multiple supported triangulation formats. See next section.
 ## Usage
 The block model must be in one of the supported formats:
