@@ -18,7 +18,7 @@ Its not yet suited for production use.
 ## How to install
 First, install a python distribution such as [WinPython](https://winpython.github.io/). Version must be >= 3.7. Version 3.8.x recomended.  
 Download all files from this repository root to a local folder with execute permissions. On Windows this means a folder outside the user directories, because locations such as Downloads, Documents, Desktop, etc do not allow .cmd files to run.  
-Only one required module is not included by default in WinPython and other mainstrean distros: pyvista. Install using:  
+Only one required module is not included by default in WinPython and other mainstrean distros: pyvista. Install using this folowing command in the WinPython Command Prompt (Not in python console!):  
 `pip install pyvista`
 ## Run
 The simplest way to run is to execute (double click on windows explorer) the supplied vtk_reserves.cmd file. This batch script shoud detect a WinPython distribution and use it automatically to call the main py file (vtk_reserves.py).  
