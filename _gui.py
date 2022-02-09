@@ -40,13 +40,13 @@ def pyd_zip_extract():
     return
   platform_arch = '.cp%d%d-win_amd64' % (sys.hexversion >> 24, sys.hexversion >> 16 & 0xFF)
 
-  pyd_path = os.environ['TEMP'] + "/pyz_" + platform_arch
+  pyd_path = os.environ.get('TEMP', '.') + "/pyz_" + platform_arch
 
   if not os.path.isdir(pyd_path):
     os.mkdir(pyd_path)
 
   sys.path.insert(0, pyd_path)
-  os.environ['PATH'] += ';' + pyd_path
+  os.environ['PATH'] = os.environ.get('PATH', '') + ';' + pyd_path
 
   import zipfile
   zip_root = zipfile.ZipFile(zip_path)
@@ -2190,8 +2190,7 @@ class Branding(object):
   _gc = []
   def __init__(self, f='ICO', size=None, choice=None):
     if choice is None:
-      if 'USERDOMAIN' in os.environ:
-        self._choice = os.environ['USERDOMAIN']
+      self._choice = os.environ.get('USERDOMAIN')
     else:
       self._choice = choice
 
