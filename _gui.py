@@ -23,16 +23,15 @@ https://github.com/pemn/usage-gui
 __version__ = 20211111
 
 ### { HOUSEKEEPING
-
-import sys, os, os.path, time
-#print(__name__,__version__, file=sys.stderr)
+import sys, os, os.path, time, logging
 # fix for wrong path of pythoncomXX.dll in vulcan 10.1.5
 if 'VULCAN_EXE' in os.environ:
   os.environ['PATH'] += ';' + os.environ['VULCAN_EXE'] + "/Lib/site-packages/pywin32_system32"
-
 ### } HOUSEKEEPING
 
 ### { UTIL
+logging.basicConfig(format='%(message)s', level=99)
+log = lambda *argv: logging.log(99, ' '.join(map(str,argv)))
 
 def pyd_zip_extract():
   ''' embedded module unpacker '''
@@ -101,21 +100,22 @@ class commalist(list):
   def split(self, *args):
     return [",".join(_) for _ in self]
 
-def pd_synonyms(df, synonyms):
+def pd_synonyms(df, synonyms, default = 0):
   ''' from a list of synonyms, find the best candidate amongst the dataframe columns '''
-  if len(synonyms) == 0:
-    return df.columns[0]
-  # first try a direct match
-  for v in synonyms:
-    if v in df:
-      return v
-  # second try a case insensitive match
-  for v in synonyms:
-    m = df.columns.str.match(v, False)
-    if m.any():
-      return df.columns[m.argmax()]
+  if len(synonyms):
+    # first try a direct match
+    for v in synonyms:
+      if v in df:
+        return v
+    # second try a case insensitive match
+    for v in synonyms:
+      m = df.columns.str.match(v, False)
+      if m.any():
+        return df.columns[m.argmax()]
   # fail safe to the first column
-  return df.columns[0]
+  if default is not None:
+    return df.columns[default]
+  return None
 
 def table_name_selector(df_path, table_name = None):
   if table_name is None:
@@ -194,7 +194,6 @@ def pd_load_dataframe(df_path, condition = '', table_name = None, vl = None, kee
   import pandas as pd
   if table_name is None:
     df_path, table_name = table_name_selector(df_path)
-
   df = None
   if not os.path.exists(df_path):
     print(df_path,"not found")
@@ -555,7 +554,7 @@ def pd_load_dgd(df_path, layer_dgd = None):
   if dgd.is_open():
     layers = layer_dgd
     if layer_dgd is None:
-      layers = dgd_list_layers()
+      layers = dgd_list_layers(df_path)
     elif not isinstance(layer_dgd, list):
       layers = [layer_dgd]
 
@@ -649,18 +648,24 @@ def pd_load_tri(df_path):
   import numpy as np
   import pandas as pd
   tri = vulcan.triangulation(df_path)
+
+  ta = vulcan.tri_attributes(df_path)
+  
+
   cv = tri.get_colour()
   cn = 'colour'
   if vulcan.version_major >= 11 and tri.is_rgb():
     cv = np.sum(np.multiply(tri.get_rgb(), [2**16,2**8,1]))
     cn = 'rgb'
-  print("pd_load_tri nodes",tri.n_nodes(),"faces",tri.n_faces())
+  #print("pd_load_tri nodes",tri.n_nodes(),"faces",tri.n_faces())
   #df = [tri.get_node(int(f[n])) + [0,bool(n),n,1,f[n],cv] for f in tri.get_faces() for n in range(3)], 
   # orphan nodes
-  return nodes_faces_to_df(tri.get_vertices(), tri.get_faces())
+  df =  nodes_faces_to_df(tri.get_vertices(), tri.get_faces())
+  if ta.is_ok():
+    for k,v in ta.get_hash().items():
+      df[k] = v
 
-
-  #return pd.DataFrame(df, columns=smartfilelist.default_columns + ['closed','node',cn])
+  return df
 
 
 def df_to_nodes_faces_simple(df, node_name = 'node', xyz = ['x','y','z']):
@@ -1052,7 +1057,7 @@ def leapfrog_load_mesh(df_path):
       break
   file.close()
 
-  print("%02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x = %.2f %.2f %.2f" % tuple(struct.unpack_from('12B', binary, 0) + struct.unpack_from('3f', binary, 0)))
+  log("%02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x = %.2f %.2f %.2f" % tuple(struct.unpack_from('12B', binary, 0) + struct.unpack_from('3f', binary, 0)))
   # skip unknown 12 byte header
   # maybe on some cases it contains rgb color?
   p = 12
@@ -1402,7 +1407,7 @@ class smartfilelist(object):
         elif input_ext == ".msh" and s == 0:
           r = smartfilelist.default_columns + ['closed','node']
         elif input_ext == ".csv":
-          df = pd.read_csv(df_path, None, encoding="latin_1", engine="python", nrows=s == 0 and 1 or None)
+          df = pd.read_csv(df_path, encoding="latin_1", nrows=s == 0 and 1 or None)
           if s == 0:
             r = df.columns.tolist()
           if s == 1:
@@ -1413,6 +1418,14 @@ class smartfilelist(object):
             r = df['name'].tolist()
           else:
             r = df.columns.tolist()
+        elif input_ext == ".ipynb":
+          import json
+          d = json.load(open(df_path, 'rb'))
+          i = 0
+          while i < len(d['cells']):
+            if d['cells'][i]['cell_type'] == 'code':
+              break
+          r = [str.split(_, ' = ')[0] for _ in  d['cells'][i]['source']]
         elif re.search(r'xls\w?$', df_path, re.IGNORECASE):
           r = excel_field_list(df_path, table_name, s)
         elif input_ext == ".dm" and s == 0:
@@ -2118,7 +2131,6 @@ class AppTk(tk.Tk):
     menu_file.add_command(label='Copy Command Line', command=self.script.copy)
     menu_file.add_command(label='Open Settings', command=self.openSettings)
     menu_file.add_command(label='Save Settings', command=self.saveSettings)
-    menu_file.add_command(label='Load Metadata', command=self.importMetadata)
     menu_file.add_command(label='Exit', command=self.destroy)
     menu_help.add_command(label='Help', command=self.showHelp)
     menu_help.add_command(label='Start Command Line Window', command=self.openCmd)
@@ -2167,16 +2179,6 @@ class AppTk(tk.Tk):
     if len(result) == 0:
       return
     Settings(result).save(self.script.get(True))
-
-  def importMetadata(self):
-    result = filedialog.askopenfilename(filetypes=[("xlsx", "*.xlsx")])
-    if len(result) == 0:
-      return
-    df = pd_load_excel(result, 'metadata')
-    df.set_index('vk', inplace=True)
-    dfd = df.to_dict()
-    if 'vs' in dfd:
-      self.script.set(dfd['vs'])
   
   def destroy(self):
     Settings().save(self.script.get(True))
@@ -2188,7 +2190,8 @@ class Branding(object):
   _gc = []
   def __init__(self, f='ICO', size=None, choice=None):
     if choice is None:
-      self._choice = os.environ['USERDOMAIN']
+      if 'USERDOMAIN' in os.environ:
+        self._choice = os.environ['USERDOMAIN']
     else:
       self._choice = choice
 
