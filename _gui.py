@@ -20,10 +20,16 @@ https://github.com/pemn/usage-gui
 ---------------------------------
 '''
 
-__version__ = 20211111
+__version__ = 20221222
 
 ### { HOUSEKEEPING
-import sys, os, os.path, time, logging
+import sys, os, os.path, time, logging, re, pickle, threading
+import tkinter as tk
+import tkinter.ttk as ttk
+import tkinter.messagebox as messagebox
+import tkinter.filedialog as filedialog
+
+
 # fix for wrong path of pythoncomXX.dll in vulcan 10.1.5
 if 'VULCAN_EXE' in os.environ:
   os.environ['PATH'] += ';' + os.environ['VULCAN_EXE'] + "/Lib/site-packages/pywin32_system32"
@@ -31,7 +37,7 @@ if 'VULCAN_EXE' in os.environ:
 
 ### { UTIL
 logging.basicConfig(format='%(message)s', level=99)
-log = lambda *argv: logging.log(99, ' '.join(map(str,argv)))
+log = lambda *argv: logging.log(99, time.strftime('%H:%M:%S ') + ' '.join(map(str,argv)))
 
 def pyd_zip_extract():
   ''' embedded module unpacker '''
@@ -60,6 +66,37 @@ def pyd_zip_extract():
           subzip = os.path.join(pyd_path, name)
           zipfile.ZipFile(subzip).extractall(pyd_path)
 
+def package_install(*argv):
+  r = [sys.executable, '-m', 'pip', 'install'] + list(argv)
+  print(' '.join(r))
+  os.system(' '.join(r))
+  sys.exit()
+
+def package_require(*argv):
+  from importlib.util import find_spec
+  r = []
+  for kv in argv:
+    k = v = kv
+    if isinstance(kv, tuple):
+      k,v = kv
+    if not find_spec(k):
+      r.append(v)
+  if len(r):
+    if messagebox.askyesno(sys.argv[0], 'install required modules: ' + ','.join(r)):
+      package_install(*r)
+
+def import_vulcan():
+  # custom vulcan import for hybrid scripts
+  try:
+    import __main__, __mp_main__, vulcan
+    # main package
+    __main__.vulcan = vulcan
+    __mp_main__.vulcan = vulcan
+    # this package
+    globals()['vulcan'] = vulcan
+  except:
+    messagebox.showerror('import vulcan', 'This script must be run within Maptek Vulcan')
+    sys.exit(1)
 
 def list_any(l):
   return sum(map(bool, l))
@@ -100,22 +137,6 @@ class commalist(list):
   def split(self, *args):
     return [",".join(_) for _ in self]
 
-def pd_synonyms(df, synonyms, default = 0):
-  ''' from a list of synonyms, find the best candidate amongst the dataframe columns '''
-  if len(synonyms):
-    # first try a direct match
-    for v in synonyms:
-      if v in df:
-        return v
-    # second try a case insensitive match
-    for v in synonyms:
-      m = df.columns.str.match(v, False)
-      if m.any():
-        return df.columns[m.argmax()]
-  # fail safe to the first column
-  if default is not None:
-    return df.columns[default]
-  return None
 
 def table_name_selector(df_path, table_name = None):
   if table_name is None:
@@ -192,6 +213,9 @@ def pd_load_dataframe(df_path, condition = '', table_name = None, vl = None, kee
   shp: ESRI shape file
   '''
   import pandas as pd
+  # early exit for cases where a script is calling another
+  if isinstance(df_path, pd.DataFrame):
+    return df_path
   if table_name is None:
     df_path, table_name = table_name_selector(df_path)
   df = None
@@ -199,7 +223,7 @@ def pd_load_dataframe(df_path, condition = '', table_name = None, vl = None, kee
     print(df_path,"not found")
     df = pd.DataFrame()
   elif re.search(r'(csv|asc|prn|txt)$', df_path, re.IGNORECASE):
-    df = pd.read_csv(df_path, None, engine='python', encoding="latin_1")
+    df = pd.read_csv(df_path, sep=None, engine='python', encoding='latin_1')
   elif re.search(r'xls\w?$', df_path, re.IGNORECASE):
     df = pd_load_excel(df_path, table_name)
   elif df_path.lower().endswith('bmf'):
@@ -230,12 +254,18 @@ def pd_load_dataframe(df_path, condition = '', table_name = None, vl = None, kee
     df = pd_load_spectral(df_path)
   elif df_path.lower().endswith('obj'):
     df = pd_load_obj(df_path)
+  elif df_path.lower().endswith('vtk'):
+    from pd_vtk import pv_read, vtk_mesh_to_df
+    mesh = pv_read(df_path)
+    df = vtk_mesh_to_df(mesh)
+  elif df_path.lower().endswith('arch_d'):
+    from vulcan_mapfile import pd_load_arch
+    df = pd_load_arch(df_path)
   elif re.search(r'tiff?$', df_path, re.IGNORECASE):
     import vulcan_save_tri
     df = vulcan_save_tri.pd_load_geotiff(df_path)
   else:
     df = pd.DataFrame()
-
   if not int(keep_null):
     df.mask(df == -99, inplace=True)
 
@@ -245,15 +275,67 @@ def pd_load_dataframe(df_path, condition = '', table_name = None, vl = None, kee
 
   return df
 
+def pd_synonyms(df, synonyms, default = 0):
+  import pandas as pd
+  s_lut = {}
+  s_lut['hid'] = ['hid', 'hole', 'hole_number', 'furo', 'bhid', 'dhid']
+  s_lut['x'] = ['x', 'xpt', 'mid_x', 'east', 'easting', 'leste']
+  s_lut['y'] = ['y', 'ypt', 'mid_y', 'north', 'northing', 'norte']
+  s_lut['z'] = ['z', 'zpt', 'mid_z', 'level', 'cota', 'elev']
+  s_lut['depth'] = ['depth', 'prof']
+  s_lut['brg'] = ['brg', 'azimuth', 'azim', 'azi']
+  s_lut['dip'] = ['dip', 'inclin']
+  s_lut['from'] = ['from', 'de']
+  s_lut['to'] = ['to', 'ate']
+  s_lut['length'] = ['length', 'comp']
+  if isinstance(synonyms, str) and synonyms in s_lut:
+    synonyms = s_lut[synonyms]
+
+  ''' from a list of synonyms, find the best candidate amongst the dataframe columns '''
+  if len(synonyms):
+    # first try a direct match
+    for v in synonyms:
+      if v in df:
+        return v
+    # second try a case insensitive match
+    for v in synonyms:
+      m = pd.Series(df.columns, dtype='str').str.match(v, False)
+      if m.any():
+        return df.columns[m.argmax()]
+  # fail safe to the first column
+  if default is not None:
+    return df.columns[default]
+  return None
+
+def pd_detect_xyz(df, z = True):
+  xyz = None
+  dfcs = set(df.columns)
+  for s in [['x','y','z'], ['midx','midy','midz'], ['mid_x','mid_y','mid_z'], ['xworld','yworld','zworld'], ['xcentre','ycentre','zcentre'], ['centroid_x', 'centroid_y', 'centroid_z'], ['xc','yc','zc'], ['leste', 'norte', 'cota']]:
+    if z == False:
+      s.pop()
+    for c in [str.lower, str.upper,str.capitalize]:
+      cs = list(map(c, s))
+      if dfcs.issuperset(cs):
+        xyz = cs
+        break
+    else:
+      continue
+    # break also the outter loop if the inner loop broke
+    break
+  # try again looking only for xy
+  if xyz is None and z:
+    return pd_detect_xyz(df, False)
+  return xyz
+
 def pd_flat_columns(df):
   """ convert a column multi index into flat concatenated strings """
-  fci = [" ".join(_) for _ in df.columns.to_flat_index()]
+  fci = [" ".join(map(str,_)) for _ in df.columns.to_flat_index()]
   df.set_axis(fci, 1, True)
 
 def pd_save_dataframe(df, df_path, sheet_name='Sheet1'):
   import pandas as pd
   ''' save a dataframe to one of the supported formats '''
-  if df.size:
+  if df is not None and df.size:
     if df.ndim == 1:
       # we got a series somehow?
       df = df.to_frame()
@@ -263,10 +345,11 @@ def pd_save_dataframe(df, df_path, sheet_name='Sheet1'):
         df.reset_index(levels, drop=True, inplace=True)
       df.reset_index(inplace=True)
     if isinstance(df.columns, pd.MultiIndex):
+      print("multi")
       pd_flat_columns(df)
     if isinstance(df_path, pd.ExcelWriter) or df_path.lower().endswith('.xlsx'):
       # multiple excel sheets mode
-      df.to_excel(df_path, index=False, sheet_name=sheet_name)
+      df.to_excel(df_path, index=False, sheet_name=sheet_name, encoding='latin_1')
     elif df_path.lower().endswith('dgd.isis'):
       pd_save_dgd(df, df_path)
     elif df_path.lower().endswith('isis'):
@@ -290,11 +373,22 @@ def pd_save_dataframe(df, df_path, sheet_name='Sheet1'):
       pd_save_obj(df, df_path)
     elif df_path.lower().endswith('png'):
       pd_save_spectral(df, df_path)
+    elif df_path.lower().endswith('vtk'):
+      from pd_vtk import pv_save, vtk_df_to_mesh
+      mesh = vtk_df_to_mesh(df)
+      pv_save(mesh, df_path)
     elif re.search(r'tiff?$', df_path, re.IGNORECASE):
       import vulcan_save_tri
       vulcan_save_tri.pd_save_geotiff(df, df_path)
-    elif len(df_path):
-      df.to_csv(df_path, index=False)
+    elif len(df_path) and df_path != '|':
+      if sys.hexversion < 0x3080000:
+        # no single case works for vulcan python 3.5
+        try:
+          df.to_csv(df_path, index=False, encoding='latin_1')
+        except:
+          df.to_csv(df_path, index=False, encoding='utf8')
+      else:
+        df.to_csv(df_path, index=False, encoding='utf8', errors='backslashreplace')
     else:
       print(df.to_string(index=False))
   else:
@@ -374,6 +468,7 @@ def pd_auto_schema(df, xyzd):
   return xyzo, xyz0, xyz1, xyzn
 
 def pd_save_bmf(df, df_path):
+  import vulcan
   import numpy as np
   import pandas as pd
   xyzw = ['xworld','yworld','zworld']
@@ -397,11 +492,7 @@ def pd_save_bmf(df, df_path):
 
     vl = df.columns[vlc:]
 
-    try:
-      import vulcan
-    except:
-      print("vulcan module not found", file=sys.stderr)
-      return
+
     bm = vulcan.block_model()
     # self, name, x0, y0, z0, x1, y1, z1, nx, ny, nz
     # bm.create_regular(df_path, *xyz0, *xyz1, *xyzn)
@@ -453,10 +544,10 @@ def isisdb_check_table_name(db, table_name):
   return table_name
 
 def pd_load_isisdb(df_path, table_name = None):
+  import vulcan
   import pandas as pd
   if os.path.exists(df_path + '_lock'):
     raise Exception('Input database locked')
-  import vulcan
   db = vulcan.isisdb(df_path)
   table_name = isisdb_check_table_name(db, table_name)
 
@@ -478,11 +569,10 @@ def pd_load_isisdb(df_path, table_name = None):
   return pd.DataFrame(fdata, None, vl)
 
 def pd_save_isisdb(df, df_path, table_name = None):
-  print("# pd_save_isisdb")
+  import vulcan
   import pandas as pd
   if os.path.exists(df_path + '_lock'):
     raise Exception('Input database locked')
-  import vulcan
   db = vulcan.isisdb(df_path)
   table_name = isisdb_check_table_name(db, table_name)
   header = db.synonym('IDENT', 'HOLEID')
@@ -515,11 +605,11 @@ def pd_save_isisdb(df, df_path, table_name = None):
       db.append()
 
 def pd_update_isisdb(df, df_path, table_name = None, vl = None):
+  import vulcan
   import numpy as np
   import pandas as pd
   if os.path.exists(df_path + '_lock'):
     raise Exception('Input database locked')
-  import vulcan
   if vl is None:
     vl = df.columns
   if np.ndim(vl) == 0:
@@ -543,8 +633,8 @@ def pd_update_isisdb(df, df_path, table_name = None, vl = None):
 
 def pd_load_dgd(df_path, layer_dgd = None):
   ''' create a dataframe with object points and attributes '''
-  import pandas as pd
   import vulcan
+  import pandas as pd
   obj_attr = ['name', 'group', 'feature', 'description', 'value', 'colour']
   df = pd.DataFrame(None, columns=smartfilelist.default_columns + ['p','closed','layer','oid'] + obj_attr)
 
@@ -561,6 +651,7 @@ def pd_load_dgd(df_path, layer_dgd = None):
     for l in layers:
       if not dgd.is_layer(l):
         continue
+      log("reading layer", l)
       layer = dgd.get_layer(l)
       oid = 0
       for obj in layer:
@@ -569,7 +660,7 @@ def pd_load_dgd(df_path, layer_dgd = None):
         df_row['layer'] = layer.get_name()
         for t in obj_attr:
           df_row[t] = getattr(obj, t)
-        if obj.get_type() == 'TEXT3D':
+        if obj.get_type().startswith('TEXT'):
           df_row['x'],df_row['y'],df_row['z'],df_row['w'],df_row['t'],df_row['p'] = obj.get_origin()
           df_row['n'] = 0
           df.loc[row] = df_row
@@ -592,19 +683,9 @@ def pd_load_dgd(df_path, layer_dgd = None):
 
   return df
 
-def pd_save_dgd(df, df_path):
-  ''' create vulcan objects from a dataframe '''
+def pd_to_vulcan_layers(df, xyz):
   import vulcan
   obj_attr = ['value', 'name', 'group', 'feature', 'description']
-  xyz = ['x','y','z']
-  if 'w' in df:
-    xyz.append('w')
-  if 't' in df:
-    xyz.append('t')
-
-
-  dgd = vulcan.dgd(df_path, 'w' if os.path.exists(df_path) else 'c')
-
   layer_cache = dict()
 
   c = []
@@ -630,16 +711,38 @@ def pd_save_dgd(df, df_path):
         obj.set_closed(bool(df.loc[row, 'closed']))
       for i in range(len(obj_attr)):
         if obj_attr[i] in df:
-          v = str(df.loc[row, obj_attr[i]])
+          v = df.loc[row, obj_attr[i]]
           if i == 0:
-            v = float(df.loc[row, obj_attr[i]])
-
+            v = float(v)
+          elif v != v:
+            # v is nan
+            v = ''
+          else:
+            # vulcan API crashes on some unicode characters
+            v = str(bytes(v, 'ascii', 'replace'), 'ascii')
           setattr(obj, obj_attr[i], v)
 
       layer_cache[layer_name].append(obj)
       c.clear()
 
+  return layer_cache
+
+
+def pd_save_dgd(df, df_path):
+  ''' create vulcan objects from a dataframe '''
+  import vulcan
+  xyz = ['x','y','z','w','t']
+  if 'w' not in df:
+    df['w'] = 0
+
+  if 't' not in df:
+    df['t'] = 0
+  
+  layer_cache = pd_to_vulcan_layers(df, xyz)
+
+  dgd = vulcan.dgd(df_path, 'w' if os.path.exists(df_path) else 'c')
   for v in layer_cache.values():
+    log("saving layer", v.name)
     dgd.save_layer(v)
 
 # Vulcan Triangulation 00t
@@ -808,37 +911,53 @@ def excel_field_list(df_path, table_name, alternate = False):
   
   return r
 
-def pd_load_excel_350(df_path, table_name):
+def pd_from_openpyxl(ws):
   import pandas as pd
+  data = ws.values
+  cols = list(next(data))
+  # handle duplicate columns
+  for i in range(len(cols)):
+    for j in range(i-1,-1,-1):
+      if cols[i] == cols[j]:
+        cols[i] += '.' + str(i)
+
+  return pd.DataFrame(data, columns=[i if cols[i] is None else cols[i] for i in range(len(cols))])  
+
+def pd_load_excel_350(df_path, table_name):
   import openpyxl
   wb = openpyxl.load_workbook(df_path)
+  ws = None
   if table_name and table_name in wb:
-    data = wb[table_name].values
+    ws = wb[table_name]
   else:
-    data = wb.active.values
-  cols = next(data)
-  return pd.DataFrame(data, columns=[i if cols[i] is None else cols[i] for i in range(len(cols))])
+    ws = wb.active
+  # handle duplicated columns
+  return pd_from_openpyxl(ws)
 
 def pd_load_excel(df_path, table_name = None):
   if sys.hexversion < 0x3060000:
     return pd_load_excel_350(df_path, table_name)
   import pandas as pd
   df = None
-  engine='openpyxl'
+  engine = 'openpyxl'
   if df_path.lower().endswith('.xls'):
     # openpyxl is not handling xls anymore
     engine = None
+  if not table_name:
+    table_name = None
   df = pd.read_excel(df_path, table_name, engine=engine)
   if not isinstance(df, pd.DataFrame):
     _, df = df.popitem()
 
   return df
 
-def pd_save_excel_tables(save_path, *arg):
+def pd_save_excel_tables(save_path, *arg, header=True):
   import openpyxl
   from openpyxl.worksheet.table import Table
   from openpyxl.utils import get_column_letter
   from openpyxl.utils.dataframe import dataframe_to_rows
+  from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+  from openpyxl.worksheet.worksheet import Worksheet
 
   wb = openpyxl.Workbook()
   # remove the default Sheet1
@@ -847,17 +966,24 @@ def pd_save_excel_tables(save_path, *arg):
     t = None
     if i+1 < len(arg):
       t = arg[i+1]
-    if t is None:
+    if not t:
       t = 'Table%d' % (i / 2 + 1)
-    ws = wb.create_sheet(title=t)
     df = arg[i]
-    if not str(arg[i].index.dtype).startswith('int'):
-      df = arg[i].reset_index()
-    for r in dataframe_to_rows(df, index=False, header=True):
-      ws.append(r)
-
-    tab = Table(displayName=t, ref="A1:%s%d" % (get_column_letter(ws.max_column), ws.max_row))
-    ws.add_table(tab)
+    # solve IllegalCharacterError problems
+    if not isinstance(df, Worksheet):
+      df.replace(ILLEGAL_CHARACTERS_RE, ' ', inplace=True)
+    ws = wb.create_sheet(title=t)
+    if isinstance(df, openpyxl.worksheet.worksheet.Worksheet):
+      for row in df.values:
+        ws.append(row)
+    else:
+      if not str(arg[i].index.dtype).startswith('int'):
+        df = arg[i].reset_index()
+      for r in dataframe_to_rows(df, index=False, header=header):
+        ws.append(r)
+      if header:
+        tab = Table(displayName=t, ref="A1:%s%d" % (get_column_letter(ws.max_column), ws.max_row))
+        ws.add_table(tab)
 
   wb.save(save_path)
 
@@ -1068,8 +1194,8 @@ def leapfrog_load_mesh(df_path):
     if not part_size:
       part_size = part_wide
       part_wide = 1
-    part_name = str(part_name, encoding='ascii')
-    part_type = str(part_type, encoding='ascii').lower()
+    part_name = str(part_name, 'ascii')
+    part_type = str(part_type, 'ascii').lower()
     part_wide = int(part_wide)
     part_size = int(part_size)
 
@@ -1142,7 +1268,7 @@ def pd_save_spectral(df, df_path):
   import numpy as np
   # original image width and height are recoverable from the max x and max y
   wh = np.max(df, 0)
-  df.drop(['x','y'], 1, inplace=True)
+  df.drop(['x','y'], axis=1, inplace=True)
 
   if wh.size > 3:
     im_out = np.reshape(df.values, (wh['x'] + 1, wh['y'] + 1, wh.size - 2))
@@ -1203,15 +1329,80 @@ def pd_save_obj(df, df_path):
   nodes, faces, lines = df_to_nodes_faces_lines(df)
   wavefront_save_obj(df_path, {"v": nodes, "f": faces, "l": lines})
 
+# Las
+def pd_load_las(df_path):
+  import lasio
+  f,c = lasio.open_file(df_path, autodetect_encoding_chars=-1)
+  las = lasio.read(f)
+  f.close()
+  df = las.df()
+  df.reset_index(inplace=True)
+  return df
+
+
 ### } IO
+### { UTIL
+
+def pd_detect_rr(df, xyz = None):
+  '''
+  extract a rotated rectangle from df points
+  '''
+  if xyz is None:
+    xyz = pd_detect_xyz(df)
+  from shapely.geometry import MultiPoint, Polygon
+
+  pxyz = df.drop_duplicates(xyz[:2])
+  pxyz = pxyz[xyz[:2]].values
+  p2d = MultiPoint(pxyz)
+  if sys.hexversion >= 0x3080000:
+    mrr = p2d.minimum_rotated_rectangle
+  else:
+    mrr = p2d.envelope
+  #return getRectangleRotation(mrr.exterior.coords)
+  return mrr.exterior.coords
+
+def getRectangleSchema(rect, cell_size):
+  '''
+  convert a rotate rectangle into a schema with bearing
+  '''
+  import numpy as np
+  if type(cell_size) in [int, float, str]:
+    cell_size = np.full(3, cell_size, dtype=np.float_)
+
+  dims = None
+  #roi = int(np.argmin(rect))
+  roi = 0
+  origin = rect[roi]
+  bearing = 0
+  o_n = None
+  for i in range(len(rect)):
+    if o_n is None or np.linalg.norm(rect[i]) < np.linalg.norm(rect[o_n]):
+      o_n = i
+  #o_s = 0
+  dims = np.ones(2)
+  # [n,n-1] , [n,n+1]
+  d_s = []
+  for k in [-1,+1]:
+    d = 0
+    s = 0
+    n = o_n
+    while d <= 0.001:
+      n += k
+      s = np.subtract(rect[o_n], rect[n])
+      d = np.linalg.norm(s)
+    d_s.append(d)
+    print("i",i,"n",n,"o_n",o_n)
+    # use last s
+    o_s = s
+  
+  dims = np.ceil(np.asarray(d_s) / cell_size[:2])
+  if o_s[1] != 0:
+    bearing = np.rad2deg(np.arctan(o_s[0]/o_s[1]))
+  return rect[o_n], dims, bearing
+
+### } UTIL
 
 ### { GUI
-import tkinter as tk
-import tkinter.ttk as ttk
-import tkinter.messagebox as messagebox
-import tkinter.filedialog as filedialog
-import re, pickle, threading
-from PIL import Image, ImageDraw
 
 # show gui or run main
 def usage_gui(usage = None):
@@ -1284,6 +1475,7 @@ class ClientScript(list):
 
     if not p:
       print("# %s %s finished" % (time.strftime('%H:%M:%S'), cls.file()))
+
     return p
 
   @classmethod
@@ -1407,7 +1599,7 @@ class smartfilelist(object):
         elif input_ext == ".msh" and s == 0:
           r = smartfilelist.default_columns + ['closed','node']
         elif input_ext == ".csv":
-          df = pd.read_csv(df_path, encoding="latin_1", nrows=s == 0 and 1 or None)
+          df = pd.read_csv(df_path, sep=None, engine='python', encoding='latin_1', nrows=s == 0 and 1 or None)
           if s == 0:
             r = df.columns.tolist()
           if s == 1:
@@ -1425,6 +1617,7 @@ class smartfilelist(object):
           while i < len(d['cells']):
             if d['cells'][i]['cell_type'] == 'code':
               break
+            i += 1
           r = [str.split(_, ' = ')[0] for _ in  d['cells'][i]['source']]
         elif re.search(r'xls\w?$', df_path, re.IGNORECASE):
           r = excel_field_list(df_path, table_name, s)
@@ -1451,6 +1644,8 @@ class smartfilelist(object):
             r.extend(pv.read(df_path).array_names)
           except:
             print("pyvista or vtk modules could not be loaded")
+        elif input_ext == ".las":
+          r = pd_load_las(df_path).columns.tolist()
 
         smartfilelist._cache[s][df_path] = r
 
@@ -1501,7 +1696,10 @@ class ScriptFrame(ttk.Frame):
       if token.type == '@':
         c = CheckBox(self, token.name, int(token.data) if token.data else 0)
       elif token.type == '*':
-        c = FileEntry(self, token.name, token.data)
+        if token.data:
+          c = FileEntry(self, token.name, token.data)
+        else:
+          c = DirectoryEntry(self, token.name)
       elif token.type == '=':
         c = LabelCombo(self, token.name, token.data)
       elif token.type == '#':
@@ -1528,7 +1726,7 @@ class ScriptFrame(ttk.Frame):
         c = LabelEntry(self, token.name)
       else:
         continue
-      c.pack(anchor="w", padx=20, pady=10, fill=tk.BOTH)
+      c.pack(anchor="w", fill=tk.BOTH, padx=20, pady=10)
       
   def copy(self):
     "Assemble the current parameters and copy the full command line to the clipboard"
@@ -1554,7 +1752,7 @@ class ScriptFrame(ttk.Frame):
     args = []
     for t in self.tokens:
       arg = str(self.children[t.name].get())
-      if len(arg) == 0 or not set(' ";%\\').isdisjoint(arg):
+      if len(arg) == 0 or not set(' ",;%!\\').isdisjoint(arg):
         arg = '"' + arg + '"'
       args.append(arg)
 
@@ -1702,7 +1900,7 @@ class LabelCombo(ttk.Frame):
       self.set(values[0])
     # MAGIC: if any of the values is the same name as the control, select it
     for _ in values:
-      if _.lower() == self.winfo_name():
+      if _ and _.lower() == self.winfo_name():
         self.set(_)
 
   def configure(self, **kw):
@@ -1734,7 +1932,7 @@ class ComboPicker(LabelCombo):
       # special case - show all lists in a sharepoint site
       if self._source == 'sharepoint':
         from sp_custom import sp_lists
-        self.setValues(sp_lists(source_widget.username, source_widget.password))
+        self.setValues(sp_lists(source_widget.username, source_widget.pw))
       else:
         self.setValues(smartfilelist.get(source_widget.get(), self._alternate))
     else:
@@ -1817,7 +2015,39 @@ class FileEntry(ttk.Frame):
     self._button.configure(**kw)
     self._control.configure(**kw)
 
-# helper function to securely handle username + password
+class DirectoryEntry(ttk.Frame):
+  '''custom Entry, with label and a Browse button'''
+  _label = None
+  _button = None
+  _control = None
+  def __init__(self, master, label, wildcard=''):
+    ttk.Frame.__init__(self, master, name=label)
+    self._button = ttk.Button(self, text="⛚", command=self.onBrowse)
+    self._button.pack(side=tk.RIGHT)
+    self._control = ttk.Entry(self)
+    self._control.pack(expand=True, fill=tk.BOTH, side=tk.RIGHT)
+    self._label = ttk.Label(self, text=label, width=-20)
+    self._label.pack(side=tk.LEFT)
+
+  # activate the browse button, which shows a native fileopen dialog and sets the Entry control
+  def onBrowse(self):
+    r = filedialog.askdirectory()
+    if r:
+      self.set(relative_paths(r))
+
+  def get(self):
+    return self._control.get()
+  
+  def set(self, value):
+    self._control.delete(0, tk.END)
+    self._control.insert(0, value)
+
+  def configure(self, **kw):
+    self._button.configure(**kw)
+    self._control.configure(**kw)
+    self._label.configure(**kw)
+
+# helper function to securely handle username + pass
 class Credentials(list):
   '''
   store credentials in a manageable manner
@@ -1829,7 +2059,7 @@ class Credentials(list):
     import base64
     import cryptography.fernet
     import uuid
-    # use symmetric encryption on the password
+    # use symmetric encryption on the pass
     # local unique node id is used as key
     # decoding is possible to anyone with filesystem
     # and execute access to where the store was created!
@@ -1857,11 +2087,11 @@ class Credentials(list):
     self[0] = value
 
   @property
-  def password(self):
+  def pw(self):
     return self[1]
 
-  @password.setter
-  def password(self, value):
+  @pw.setter
+  def pw(self, value):
     self[1] = value
 
   @property
@@ -1879,10 +2109,10 @@ class Credentials(list):
       step2 = b''
     self[1] = str(step2, self._encoding)
 
-# username + password
+# username + pass
 class CredentialsInput(ttk.LabelFrame):
   ''' 
-  Control to input username and Password
+  Control to input username and Pass
   The result will be a single string in the format:
   user:encodedpass
   '''
@@ -1906,12 +2136,12 @@ class CredentialsInput(ttk.LabelFrame):
     return self._u.get()
     
   @property
-  def password(self):
+  def pw(self):
     return self._p.get()
     
   def get(self):
     self._c.username = self._u.get()
-    self._c.password = self._p.get()
+    self._c.pw = self._p.get()
     return str(self._c)
 
   def set(self, value):
@@ -1923,7 +2153,7 @@ class CredentialsInput(ttk.LabelFrame):
       self._u.insert(0, self._c.username)
     if len(value) > 1:
       self._p.delete(0, tk.END)
-      self._p.insert(0, self._c.password)
+      self._p.insert(0, self._c.pw)
 
   def configure(self, **kw):
     self._u.configure(**kw)
@@ -1939,7 +2169,7 @@ class ButtonEntry(ttk.Frame):
     ttk.Frame.__init__(self, master, name=label)
     self._callback = callback
     self._control = ttk.Entry(self)
-    self._control.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
+    self._control.pack(expand=True, fill=tk.BOTH, side=tk.LEFT)
     if len(label) == 1:
       self._button = ttk.Button(self, text=label, command=self.action, width=3)
       self._button['style'] = 'basic.TButton'
@@ -2072,6 +2302,7 @@ class AppTk(tk.Tk):
   '''TK-Based Data driven GUI application'''
   _iconfile = None
   _logofile = None
+  _w10t = None
   def __init__(self, usage, client=sys.argv[0]):
     ClientScript.init(client)
     tk.Tk.__init__(self)
@@ -2085,12 +2316,12 @@ class AppTk(tk.Tk):
     self.canvas = tk.Canvas(width=self.winfo_screenwidth() * 0.35)
     self.script = ScriptFrame(self.canvas, usage)
 
-    self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    self.canvas.pack(expand=True, fill=tk.BOTH, side=tk.LEFT)
     self.canvas_frame = self.canvas.create_window((0,0), window=self.script, anchor="nw")
     self.vsb = ttk.Scrollbar(orient=tk.VERTICAL, command=self.canvas.yview)
     self.canvas.configure(yscrollcommand=self.vsb.set)
 
-    self.vsb.pack(side=tk.LEFT, fill=tk.Y)
+    self.vsb.pack(fill=tk.Y, side=tk.LEFT)
     self.script.bind("<Configure>", self.onFrameConfigure)
     self.canvas.bind('<Configure>', self.onCanvasConfigure)
 
@@ -2099,13 +2330,13 @@ class AppTk(tk.Tk):
     self.logo = tk.Canvas(self, width=self._logofile.image.size[0], height=self._logofile.image.size[1])
     
     self.logo.create_image(0, 0, anchor='nw', image=self._logofile.photoimage)
-    self.logo.pack(side=tk.TOP, anchor="ne")
+    self.logo.pack(anchor="ne", side=tk.TOP)
 
     self.button = ttk.Button(self, text="Run", command=self.runScript)
     self.button.pack(side=tk.LEFT)
     
     self.progress = ttk.Progressbar(self, mode="determinate")
-    self.progress.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=10)
+    self.progress.pack(expand=True, fill=tk.X, padx=10, side=tk.LEFT)
 
     self.createMenu()
     self.script.set(Settings().load())
@@ -2124,7 +2355,6 @@ class AppTk(tk.Tk):
     self.option_add('*tearOff', False)
     menubar = tk.Menu(self)
     menu_file = tk.Menu(menubar)
-    menu_edit = tk.Menu(menubar)
     menu_help = tk.Menu(menubar)
     menubar.add_cascade(menu=menu_file, label='File')
     menubar.add_cascade(menu=menu_help, label='Help')
@@ -2135,29 +2365,47 @@ class AppTk(tk.Tk):
     menu_help.add_command(label='Help', command=self.showHelp)
     menu_help.add_command(label='Start Command Line Window', command=self.openCmd)
     menu_help.add_command(label='About', command=self.showAbout)
+    if sys.hexversion >= 0x3080000:
+      # enable desktop notifications instead of OK dialog boxes when script finishes
+      try:
+        from win10toast import ToastNotifier
+        self._w10t = ToastNotifier()
+      except:
+        menu_plus = tk.Menu(menubar)
+        menu_plus.add_command(label='Enable finished notifications', command=self.installToast)
+        menubar.add_cascade(menu=menu_plus, label='Options')
+
     self['menu'] = menubar
       
   def runScript(self):
     # run the process in another thread as not to block the GUI message loop
+
     def fork():
       self.button.configure(state = "disabled")
       self.progress.configure(value = 0, mode = "indeterminate")
       self.progress.start()
+      t = time.time()
+      p = ClientScript.run(self.script)
       
-      if ClientScript.run(self.script):
-        messagebox.showwarning(message="Check console messages",title=ClientScript.type())
-
       self.progress.stop()
-      self.progress.configure(value = 100)
+      self.progress.configure(value = p and 50 or 100)
       self.progress.configure(mode = "determinate")
       self.button.configure(state = "enabled")
+
+      if self._w10t:
+        if (time.time() - t) > 9:
+          self._w10t.show_toast(ClientScript.file(), p and "check console messages" or "finished")
+      elif p:
+        messagebox.showwarning(message="Check console messages",title=ClientScript.type())
 
     threading.Thread(None, fork).start()
 
   def showHelp(self):
-    script_pdf = ClientScript.file('pdf')
-    if os.path.exists(script_pdf):
-      os.system(script_pdf)
+    for x in ['html','pdf']:
+      script_doc = ClientScript.file(x)
+      if os.path.exists(script_doc):
+        os.startfile(script_doc)
+        break
     else:
       messagebox.showerror('Help', 'Documentation file not found')
   
@@ -2166,7 +2414,11 @@ class AppTk(tk.Tk):
     os.system('start cmd /k python -V')
     
   def showAbout(self):
-    messagebox.showinfo('About', 'Graphic User Interface to command line scripts')
+    messagebox.showinfo('About', 'Graphic User Interface to command line scripts\nhttps://github.com/pemn/usage-gui')
+
+  def installToast(self):
+    if messagebox.askyesno(sys.argv[0], 'To enable notifications the script must be closed. Continue?'):
+      package_install('win10toast')
 
   def openSettings(self):
     result = filedialog.askopenfilename(filetypes=[("ini", "*.ini")])
@@ -2188,27 +2440,30 @@ class AppTk(tk.Tk):
 # images for window icon and watermark
 class Branding(object):
   _gc = []
-  def __init__(self, f='ICO', size=None, choice=None):
-    if choice is None:
-      self._choice = os.environ.get('USERDOMAIN')
-    else:
-      self._choice = choice
-
+  def __init__(self, f='ICO', size=None):
+    from PIL import Image, ImageDraw
     self._format = f
     
     self._image = Image.new('RGBA', (800, 800))
     draw = ImageDraw.Draw(self._image)
-
-    if self._choice=='VALENET':
-      # Vale logo
-      draw.polygon((430, 249, 397,698, 803,160,  766,139, 745,132, 727,130, 692,130, 655,142, 618,160, 571,188, 524,216, 477,236), "#eaab13")
-      draw.chord((-80,105, 413,588), 228, 312, "#008f83")
-      draw.polygon((0,165, 397,698, 720,270, 454,270, 454,270, 429,248, 328,165), "#008f83")
-      draw.chord((403,-40, 770,327), 44, 136, "#eaab13")
+    if sys.hexversion >= 0x3080000:
+      # winpython logo
+      draw.rectangle(( 50, 50,350,350), 'SteelBlue')
+      draw.rectangle(( 50,450,350,750), 'Gold')
+      draw.rectangle((450,450,750,750), 'SteelBlue')
+      draw.rectangle((450, 50,750,350), 'Gold')
     else:
-      # open souce logo
-      draw.pieslice([40, 40, 760, 760], 110, 70, '#3fa648')
-      draw.ellipse([288, 288, 512, 512], Image.ANTIALIAS)
+      choice = os.environ.get('USERDOMAIN')
+      if choice=='VALENET':
+        # Vale logo
+        draw.polygon((430, 249, 397,698, 803,160,  766,139, 745,132, 727,130, 692,130, 655,142, 618,160, 571,188, 524,216, 477,236), "#eaab13")
+        draw.chord((-80,105, 413,588), 228, 312, '#008f83')
+        draw.polygon((0,165, 397,698, 720,270, 454,270, 454,270, 429,248, 328,165), '#008f83')
+        draw.chord((403,-40, 770,327), 44, 136, '#eaab13')
+      else:
+        # open souce logo
+        draw.pieslice([40, 40, 760, 760], 110, 70, '#3fa648')
+        draw.ellipse([288, 288, 512, 512], Image.ANTIALIAS)
 
     del draw
     if size:
@@ -2259,7 +2514,6 @@ def main(*args):
     # redirect to caller script main
     main(*args)
     return
-
 # special entry point for cmd
 if __name__ == '__main__' and sys.argv[0].endswith('_gui.py') and len(sys.argv) == 1:
   pass
