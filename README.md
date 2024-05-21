@@ -81,6 +81,6 @@ If the display checkbox is ticked, a 3d window should appear showing the data us
 Note: Converting from/to Vulcan proprietary file formats is only possible when the script is executed using the `File > Python Script` menu within Envisage.
  - tri_decimate.py: reduce mesh complexity to allow for faster testing
 ## 💎 License
-Apache 2.0
+Apache 2.0  
 Copyright ![vale_logo_only](https://github.com/pemn/assets/blob/main/vale_logo_only_r.svg?raw=true) Vale 2022
 
