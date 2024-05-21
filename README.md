@@ -1,7 +1,7 @@
-# vtk_reserves
+#  vtk_reserves
 ore body reserve report using geological block model, topographical surfaces and region solids
   
-## Description
+## 📌 Description
 This is a complete standalone toolchain to calculate ore body reserves from a geological block model, topographical surfaces and region solids.  
 Its intended for high level use, with no required knowledge of programming or python.  
 While there are many software packages that enable this calculation, this is a fully open source sollution. Free, auditable and extendable.  
@@ -11,7 +11,7 @@ The modules used include:
  - pandas (number crunching)
  - tkinter (graphical interface)
 
-## Maturity
+## 📏 Maturity
 This solution is feature complete but still under active development.  
 Its intended for academic purposes, reserve comparison with mature tools and as a technological demonstrator of solving the required steps.  
 Its not yet suited for production use.  
@@ -73,12 +73,14 @@ It will also contain volume, mass and weighted mean of numerical variables such 
   
 If the display checkbox is ticked, a 3d window should appear showing the data used:  
 ![screenshot2](./assets/screenshot2.png?raw=true)
-## Sample Data
-There is a simple artificial dataset on the sample_data folder of this repository for testing and reference.
+## 🧊 Test Data
+[std_voxel_vtk.zip](https://github.com/pemn/vtk_reserves/raw/main/sample_data/std_voxel_vtk.zip)  
+[std_voxel_vtk.csv](https://github.com/pemn/vtk_reserves/raw/main/sample_data/std_voxel_vtk.csv)  
 ## Auxiliary tools
  - bm_to_vtk.py: convert between file formats.
 Note: Converting from/to Vulcan proprietary file formats is only possible when the script is executed using the `File > Python Script` menu within Envisage.
  - tri_decimate.py: reduce mesh complexity to allow for faster testing
-## License
+## 💎 License
 Apache 2.0
+Copyright ![vale_logo_only](https://github.com/pemn/assets/blob/main/vale_logo_only_r.svg?raw=true) Vale 2022
 
